@@ -1,5 +1,6 @@
 import { Client } from '@awo00/smb2';
 import Tree from '@awo00/smb2/dist/client/Tree';
+import File from '@awo00/smb2/dist/client/File';
 import {
 	type INodeType,
 	type INodeTypeDescription,
@@ -9,7 +10,6 @@ import {
 } from 'n8n-workflow';
 import { debuglog } from 'util';
 import { connectToSmbServer, getReadableError } from '../Smb2/helpers';
-import File from '@awo00/smb2/dist/client/File';
 
 const debug = debuglog('n8n-nodes-smb2');
 
