@@ -359,7 +359,7 @@ export class Smb2Trigger implements INodeType {
 
 			const stopFunction = await tree.watchDirectory(
 				path,
-				(response) => {
+				(response: any) => {
 					try {
 						// Process each change in the data array
 						if (response.data && Array.isArray(response.data)) {
@@ -367,7 +367,7 @@ export class Smb2Trigger implements INodeType {
 							const emitFunc = this.emit.bind(this);
 							const helpersFunc = this.helpers;
 
-							response.data.forEach(async change => {
+							response.data.forEach(async (change: any) => {
 								await processFileChange(
 									change,
 									event,
