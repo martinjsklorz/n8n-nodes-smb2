@@ -14,7 +14,7 @@
     "n8n"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/drudge/n8n-nodes-smb2",
+  "homepage": "https://github.com/martinjsklorz/n8n-nodes-smb2",
   "author": {
     "name": "MJ Sklorz",
     "email": "martinjsklorz@gmail.com"
@@ -65,7 +65,6 @@
   },
   "dependencies": {
     "@awo00/smb2": "^1.1.0",
-    "n8n": "^1.118.2",
     "tmp-promise": "^3.0.3"
   }
 }
