@@ -9,6 +9,7 @@ import {
 	NodeApiError,
 } from 'n8n-workflow';
 import { debuglog } from 'util';
+import path from 'path';
 import { connectToSmbServer, getReadableError } from '../Smb2/helpers';
 
 const debug = debuglog('n8n-nodes-smb2');
@@ -20,13 +21,15 @@ const EVENT_MAP: Record<number, string> = {
 	3: "updated",      // Modified
 };
 
+// Track pending files waiting for completion
+const pendingFiles = new Array<String>();
 
 /**
  * Waits for a file to stabilize (stop growing) before emitting an event
  */
 async function waitForFileStability(
 	tree: Tree,
-	path: string,
+	filepath: string,
 	filename: string,
 	action: number,
 	waitDuration: number,
@@ -35,10 +38,12 @@ async function waitForFileStability(
 ): Promise<void> {
 	let previousSize = BigInt(-1);
 
+	pendingFiles.push(filename);
+
 	const interval = setInterval(async () => {
 		const file = new File(tree);
 		try {
-			const fullPath = (path + "/" + filename).replace(/\/\.\//g, '/');
+			const fullPath = path.join(filepath, filename);
 			await file.open(fullPath);
 
 			debug("Opened %s (%s)", fullPath, file.fileSize);
@@ -46,7 +51,6 @@ async function waitForFileStability(
 			// File is still growing
 			if (previousSize < file.fileSize) {
 				previousSize = file.fileSize;
-
 			}
 			// File size is stable
 			else if (previousSize === file.fileSize) {
@@ -57,18 +61,23 @@ async function waitForFileStability(
 					event: EVENT_MAP[action],
 					filename: filename,
 					fileSize: previousSize.toString(),
-					path: path,
+					path: fullPath,
 				})]);
 			}
-			// File reduced to 0 - creation aborted
+			// File reduced to size 0 - creation was aborted
 			else if (previousSize > 0 && file.fileSize == BigInt(0)) {
 				debug("File %s aborted", fullPath);
 				clearInterval(interval);
 			}
 		} catch (e) {
-			debug("Error opening file: %s", e);
+			debug("Error opening file: %s", JSON.stringify(e));
 			clearInterval(interval);
+			throw e;
 		} finally {
+			const index = pendingFiles.indexOf(filename);
+			if (index > -1) {
+				pendingFiles.splice(index, 1);
+			}
 			if (file && file.isOpen) {
 				file.close();
 			}
@@ -85,7 +94,6 @@ async function processFileChange(
 	event: string,
 	waitForCompletion: boolean,
 	waitDuration: number,
-	pendingFiles: Array<String>,
 	tree: Tree,
 	path: string,
 	emitFunc: Function,
@@ -109,7 +117,6 @@ async function processFileChange(
 
 	// Handle file creation with stability check
 	if (waitForCompletion && event === 'created' && !pendingFiles.includes(filename)) {
-		pendingFiles.push(filename);
 		await waitForFileStability(tree, path, filename, action, waitDuration, emitFunc, helpersFunc);
 		return;
 	}
@@ -345,9 +352,6 @@ export class Smb2Trigger implements INodeType {
 		let closeFunction;
 		let path: any;
 
-		// Track pending files waiting for completion
-		const pendingFiles = new Array<String>();
-
 		try {
 			({ client, tree } = await connectToSmbServer.call(this));
 
@@ -373,7 +377,6 @@ export class Smb2Trigger implements INodeType {
 									event,
 									waitForCompletion,
 									waitDuration,
-									pendingFiles,
 									tree,
 									path,
 									emitFunc,
@@ -383,6 +386,7 @@ export class Smb2Trigger implements INodeType {
 						}
 					} catch (error) {
 						debug('Error in watchDirectory callback: %s', error);
+						throw new NodeApiError(this.getNode(), error, { message: (`Failed to process file event`) });
 					}
 				},
 				recursive
