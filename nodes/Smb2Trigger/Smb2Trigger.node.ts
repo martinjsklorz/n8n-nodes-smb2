@@ -184,7 +184,7 @@ export class Smb2Trigger implements INodeType {
 				description: 'Whether to wait until the file is fully written before triggering. Monitors file size and modification time.',
 			},
 			{
-				displayName: 'Wait Duration (ms)',
+				displayName: 'Wait Duration (Ms)',
 				name: 'waitDuration',
 				type: 'number',
 				default: 5000,
